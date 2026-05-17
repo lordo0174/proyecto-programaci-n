@@ -121,13 +121,11 @@ public class ventanaMercancia extends JFrame {
 			public void actionPerformed(ActionEvent e) {
 				String seleccionado = (String) desEditarM.getSelectedItem();
 				
-				// NUEVO/AÑADIDO: Se utiliza el nuevo método para extraer el ID único de forma limpia
 				String idSeleccionado = obtenerIdSeleccionado(seleccionado);
 				
 				if (idSeleccionado != null) {
 					try {
 						ventanaPrincipal.ConexionPrincipal.conectar();
-						// NUEVO/AÑADIDO: La consulta ahora busca estrictamente por la Clave Primaria (ID_Merchandise)
 						String query = "SELECT Name, Type, Price, ID_Supplier FROM merchandise WHERE ID_Merchandise = '" + idSeleccionado + "'";
 						ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
 						if (rs.next()) {
@@ -141,7 +139,6 @@ public class ventanaMercancia extends JFrame {
 						ex.printStackTrace();
 					}
 				} else {
-					// NUEVO/AÑADIDO: Integramos el método de limpieza reutilizable
 					limpiarCamposEditar();
 				}
 			}
@@ -368,7 +365,7 @@ public class ventanaMercancia extends JFrame {
 	    {
 	        ventanaPrincipal.ConexionPrincipal.conectar();
 
-	        // NUEVO/AÑADIDO: La búsqueda previa se realiza utilizando el ID
+	        //Busqueda por ID
 	        String queryBusqueda = "SELECT Name, Type, Price, ID_Supplier FROM merchandise WHERE ID_Merchandise = '" + idSeleccionado + "'";
 	        ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(queryBusqueda);
 
@@ -379,7 +376,6 @@ public class ventanaMercancia extends JFrame {
 	            String precioProducto = precioEditarM.getText().trim().isEmpty() ? rs.getString("Price") : precioEditarM.getText();
 	            String idProveedor = idProveedorEditarM.getText().trim().isEmpty() ? rs.getString("ID_Supplier") : idProveedorEditarM.getText();
 
-	            // NUEVO/AÑADIDO: Actualización condicionada únicamente al registro con el ID correspondiente
 	            String queryUpdate = "UPDATE merchandise SET " + "Name = '" + nombreProducto+ "', " + "Type = '" + tipoProducto + "', " + "Price = " + precioProducto + ", " + "ID_Supplier = " + idProveedor + " " + "WHERE ID_Merchandise = '" + idSeleccionado + "'";
 
 	            if (ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(queryUpdate) > 0)
@@ -428,14 +424,11 @@ public class ventanaMercancia extends JFrame {
 				ventanaPrincipal.ConexionPrincipal.desconectar();
 				JOptionPane.showMessageDialog(this, "Producto añadido correctamente.");
 				
-				//Se limpian los campos
-				añadirDes(desEditarM);
-				añadirDes(desEliminarM);
 				
-				// NUEVO/AÑADIDO: Reutilización del método unificado de limpieza
+				//Metodo de limpieza
 				limpiarCamposEditar();
 				
-				// Limpieza específica del panel "Añadir"
+				//Limpieza específica del panel "Añadir"
 				idAñadirM.setText("");
 				nombreAñadirM.setText("");
 				tipoAñadirM.setText("");
