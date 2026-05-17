@@ -19,6 +19,7 @@ import java.sql.SQLException;
 import java.awt.event.ActionEvent;
 import javax.swing.JComboBox;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 
 public class ventanaProveedores extends JFrame {
 
@@ -106,9 +107,38 @@ public class ventanaProveedores extends JFrame {
 		desEditarP.setBounds(45, 145, 100, 22);
 		contentPane.add(desEditarP);
 		
+		//Se ven los atributos del proveedor seleccionado.
+		desEditarP.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				String seleccionado = (String) desEditarP.getSelectedItem();
+				String idSeleccionado = obtenerIdSeleccionado(seleccionado);
+				
+				if (idSeleccionado != null) {
+					try {
+						ventanaPrincipal.ConexionPrincipal.conectar();
+						String query = "SELECT Name, Phone_number, Address, Postcode FROM supplier WHERE ID_Supplier = '" + idSeleccionado + "'";
+						ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+						if (rs.next()) {
+							nombreEditarP.setText(rs.getString("Name"));
+							telefonoEditarP.setText(rs.getString("Phone_number"));
+							direccionEditarP.setText(rs.getString("Address"));
+							cpEditarP.setText(rs.getString("Postcode"));
+						}
+						ventanaPrincipal.ConexionPrincipal.desconectar();
+					} catch (SQLException ex) {
+						ex.printStackTrace();
+					}
+				} else {
+					// Si vuelven a poner el combo en "Seleccionar" o se vacía por código, limpiamos las cajas de texto
+					limpiarCamposEditar();
+				}
+			}
+		});
+		
 		idAñadirP = new JTextField();
 		idAñadirP.setBounds(55, 91, 86, 20);
 		contentPane.add(idAñadirP);
+		idAñadirP.setEditable(false);  //Se bloquea la edición del ID ya que se calcula solo.
 		
 		nombreAñadirP = new JTextField();
 		nombreAñadirP.setBounds(176, 91, 86, 20);
@@ -146,13 +176,14 @@ public class ventanaProveedores extends JFrame {
 		desEliminarP.setBounds(232, 200, 100, 22);
 		contentPane.add(desEliminarP);
 		
-		addWindowListener(new WindowAdapter()  //Se ejecuta automaticamente cuando se entre en la ventana
+		addWindowListener(new WindowAdapter()   //Se ejecuta automaticamente cuando se entre en la ventana
 			{
 				@Override
 				public void windowOpened(WindowEvent e)
 				{
 					añadirDes(desEliminarP);  //Metodos que queremos que se ejecuten
 					añadirDes(desEditarP);
+					calcularSiguienteId();   //Se añade el metodo para que muestre el siguiente ID
 				}
 		});
 
@@ -191,12 +222,49 @@ public class ventanaProveedores extends JFrame {
 		contentPane.add(lblCp);
 	}
 	
+	public String obtenerIdSeleccionado(String itemSeleccionado) {
+		if (itemSeleccionado == null || itemSeleccionado.equals("Seleccionar")) {
+			return null;
+		}
+		String[] separado = itemSeleccionado.split(" - ");
+		return separado[0];
+	}
+
+	//Método para limpiar los campos de texto
+	public void limpiarCamposEditar() {
+		nombreEditarP.setText("");
+		telefonoEditarP.setText("");
+		direccionEditarP.setText("");
+		cpEditarP.setText("");
+	}
+
+	//Método para buscar el ID máximo de la BD y sumarle 1
+	public void calcularSiguienteId() {
+		try {
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			String query = "SELECT MAX(CAST(ID_Supplier AS UNSIGNED)) AS ultimo_id FROM supplier";
+			ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			
+			int siguienteId = 1; 
+			if (rs.next() && rs.getString("ultimo_id") != null) {
+				siguienteId = rs.getInt("ultimo_id") + 1;
+			}
+			
+			idAñadirP.setText(String.valueOf(siguienteId));
+			ventanaPrincipal.ConexionPrincipal.desconectar();
+		} catch (SQLException ex) {
+			ex.printStackTrace();
+			try { ventanaPrincipal.ConexionPrincipal.desconectar(); } catch(Exception e){}
+		}
+	}
+	
+	//Método para añadir los proveedores al desplegable de editar.
 	public void añadirDes(JComboBox desEditarP)
 	{
 		try
 		{
 			ventanaPrincipal.ConexionPrincipal.conectar();
-			String query = "SELECT ID_Supplier FROM supplier ORDER BY ID_Supplier ASC";
+			String query = "SELECT ID_Supplier, Name FROM supplier ORDER BY ID_Supplier ASC";  //Seleccionamos el nombre del proveedor ordenado por el ID del proveedor.
 			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
 			desEditarP.removeAllItems();
 			
@@ -204,13 +272,17 @@ public class ventanaProveedores extends JFrame {
 			
 			while (resultado.next())
 			{
-				//Usamos addItem para añadir el ID al desplegable
-				desEditarP.addItem(resultado.getString("ID_Supplier"));
+				String itemFormateado = resultado.getString("ID_Supplier") + " - " + resultado.getString("Name");
+				desEditarP.addItem(itemFormateado);   //addItem para evitar duplicidades
 			}
 			
 			desEditarP.setSelectedIndex(0); //Selecciona un item vacío
 			
 			ventanaPrincipal.ConexionPrincipal.desconectar();
+
+			//Forzamos la actualización del JComboBox
+			desEditarP.revalidate();
+			desEditarP.repaint();
 		}
 		catch (SQLException ex)
 		{
@@ -218,10 +290,12 @@ public class ventanaProveedores extends JFrame {
 		}
 	}
 	
-	public void eliminarItem(JComboBox desEliminarP, JComboBox desEditarP)
+	public void eliminarItem(JComboBox desEliminarP, JComboBox desEditarP) //Método para eliminar un producto por ID
 	{
-		String idParaBorrar = (String) desEliminarP.getSelectedItem();
-		if (idParaBorrar == null || idParaBorrar.equals("Seleccionar"))
+		String seleccionado = (String) desEliminarP.getSelectedItem();
+		String idParaBorrar = obtenerIdSeleccionado(seleccionado);  //Se extrae el ID del proveedor seleccionado
+
+		if (idParaBorrar == null)
 		{
 			JOptionPane.showMessageDialog(this, "Selecciona un proveedor.");
 			return;
@@ -229,12 +303,13 @@ public class ventanaProveedores extends JFrame {
 		try
 		{
 			ventanaPrincipal.ConexionPrincipal.conectar();
-			String query = "DELETE FROM supplier WHERE ID_Supplier = " + idParaBorrar;
+			String query = "DELETE FROM supplier WHERE ID_Supplier = '" + idParaBorrar + "'";
 			ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(query);
 			ventanaPrincipal.ConexionPrincipal.desconectar();
 			
 			añadirDes(desEliminarP);  //Refrescamos los desplegables al eliminar el item
 			añadirDes(desEditarP);
+			calcularSiguienteId(); // Recalculamos el ID disponible tras borrar
 		}
 		catch (SQLException ex)
 		{
@@ -242,11 +317,13 @@ public class ventanaProveedores extends JFrame {
 		}
 	}
 	
-	public void editarP()		//Metodo para editar atributos de un proveedor
+	//Metodo para editar atributos de un proveedor
+	public void editarP()
 	{
-		String idSeleccionado = (String) desEditarP.getSelectedItem();
+		String seleccionado = (String) desEditarP.getSelectedItem();
+		String idSeleccionado = obtenerIdSeleccionado(seleccionado);
 		
-		if (idSeleccionado == null || idSeleccionado.equals("Seleccionar"))
+		if (idSeleccionado == null)
 		{
 			JOptionPane.showMessageDialog(this, "Selecciona un proveedor.");
 			return;
@@ -255,7 +332,7 @@ public class ventanaProveedores extends JFrame {
 		{
 			ventanaPrincipal.ConexionPrincipal.conectar();
 			
-			String queryBusqueda = "SELECT Name, Phone_number, Address, Postcode FROM supplier WHERE ID_Supplier = " + idSeleccionado;
+			String queryBusqueda = "SELECT Name, Phone_number, Address, Postcode FROM supplier WHERE ID_Supplier = '" + idSeleccionado + "'";
 			ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(queryBusqueda);
 			if (rs.next()) 
 			{
@@ -264,11 +341,17 @@ public class ventanaProveedores extends JFrame {
 				String dirProveedor = direccionEditarP.getText().trim().isEmpty() ? rs.getString("Address") : direccionEditarP.getText();
 				String cpProveedor = cpEditarP.getText().trim().isEmpty() ? rs.getString("Postcode") : cpEditarP.getText();
 
-				String queryUpdate = "UPDATE supplier SET Name='" + nombreProveedor + "', Phone_number=" + tlfProveedor + ", Address='" + dirProveedor + "', Postcode=" + cpProveedor + " WHERE ID_Supplier=" + idSeleccionado;
+				String queryUpdate = "UPDATE supplier SET Name='" + nombreProveedor + "', Phone_number='" + tlfProveedor + "', Address='" + dirProveedor + "', Postcode='" + cpProveedor + "' WHERE ID_Supplier='" + idSeleccionado + "'";
 				
 				if (ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(queryUpdate) > 0)
 				{
+					ventanaPrincipal.ConexionPrincipal.desconectar(); // Desconectamos antes de recargar
 					JOptionPane.showMessageDialog(this, "Datos cambiados.");
+					
+					añadirDes(desEditarP);
+					añadirDes(desEliminarP);
+					limpiarCamposEditar(); // Vacía las cajas de texto automáticamente
+					return;
 				}
 			}
 			ventanaPrincipal.ConexionPrincipal.desconectar();
@@ -276,6 +359,7 @@ public class ventanaProveedores extends JFrame {
 		catch (SQLException ex)
 		{
 			ex.printStackTrace();
+			try { ventanaPrincipal.ConexionPrincipal.desconectar(); } catch(Exception e){}
 		}
 	}
 	
@@ -297,20 +381,32 @@ public class ventanaProveedores extends JFrame {
 		{
 			ventanaPrincipal.ConexionPrincipal.conectar();
 			
-			String query = "INSERT INTO supplier (ID_Supplier, Name, Phone_number, Address, Postcode) VALUES (" + idProveedor + ", '" + nombreProveedor + "', " + tlfProveedor + ", '" + dirProveedor + "', " + cpProveedor + ")";
+			String query = "INSERT INTO supplier (ID_Supplier, Name, Phone_number, Address, Postcode) VALUES ('" + idProveedor + "', '" + nombreProveedor + "', '" + tlfProveedor + "', '" + dirProveedor + "', '" + cpProveedor + "')";
 			
 			if (ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(query) > 0)
 			{
+				ventanaPrincipal.ConexionPrincipal.desconectar(); //Desconectamos antes de recargar la UI
 				JOptionPane.showMessageDialog(this, "Proveedor añadido correctamente.");
 				
 				añadirDes(desEditarP);
 				añadirDes(desEliminarP);
+				limpiarCamposEditar();
+				
+				//Limpieza de los campos de texto
+				nombreAñadirP.setText("");
+				telefonoAñadirP.setText("");
+				direccionAñadirP.setText("");
+				cpAñadirP.setText("");
+				
+				calcularSiguienteId(); //Genera el nuevo ID sumandole 1 al anterior
+				return;
 			}
 			ventanaPrincipal.ConexionPrincipal.desconectar();
 		}
 		catch (SQLException ex)
 		{
 			ex.printStackTrace();
+			try { ventanaPrincipal.ConexionPrincipal.desconectar(); } catch(Exception e){}
 		}
 	}
 	

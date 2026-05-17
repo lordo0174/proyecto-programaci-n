@@ -1,18 +1,14 @@
 package Ventanas;
 
 import java.awt.EventQueue;
-
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
-
-import ConexionBD.ConexionMySQL;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
-
 import java.awt.Font;
 import javax.swing.JButton;
 import java.awt.event.ActionListener;
@@ -49,6 +45,7 @@ public class ventanaMercancia extends JFrame {
 	private JLabel precioEtiqueta;
 	
 	private JButton btnConsultarM;
+	private JButton btnEditarM;
 	
 
 	public static void main(String[] args) {
@@ -64,9 +61,6 @@ public class ventanaMercancia extends JFrame {
 		});
 	}
 
-	/**
-	 * Create the frame.
-	 */
 	public ventanaMercancia() {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 768, 424);
@@ -91,7 +85,7 @@ public class ventanaMercancia extends JFrame {
 		lblNewLabel.setFont(new Font("Tahoma", Font.BOLD, 15));
 		contentPane.add(lblNewLabel);
 		
-		JButton btnEditarM = new JButton("EDITAR");
+		btnEditarM = new JButton("EDITAR");
 		btnEditarM.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				editarM();
@@ -115,17 +109,43 @@ public class ventanaMercancia extends JFrame {
 		atras.setBounds(42, 302, 89, 23);
 		contentPane.add(atras);
 		atras.addActionListener(e -> {
-
 			dispose();
-
 			new ventanaCompradores().setVisible(true);
-
 		});
 		
 		desEditarM = new JComboBox<String>();
 		desEditarM.setBounds(45, 145, 100, 22);
 		contentPane.add(desEditarM);
-		añadirDes(desEditarM);
+		
+		desEditarM.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				String seleccionado = (String) desEditarM.getSelectedItem();
+				
+				// NUEVO/AÑADIDO: Se utiliza el nuevo método para extraer el ID único de forma limpia
+				String idSeleccionado = obtenerIdSeleccionado(seleccionado);
+				
+				if (idSeleccionado != null) {
+					try {
+						ventanaPrincipal.ConexionPrincipal.conectar();
+						// NUEVO/AÑADIDO: La consulta ahora busca estrictamente por la Clave Primaria (ID_Merchandise)
+						String query = "SELECT Name, Type, Price, ID_Supplier FROM merchandise WHERE ID_Merchandise = '" + idSeleccionado + "'";
+						ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+						if (rs.next()) {
+							nombreEditarM.setText(rs.getString("Name"));
+							tipoEditarM.setText(rs.getString("Type"));
+							precioEditarM.setText(rs.getString("Price"));
+							idProveedorEditarM.setText(rs.getString("ID_Supplier"));
+						}
+						ventanaPrincipal.ConexionPrincipal.desconectar();
+					} catch (SQLException ex) {
+						ex.printStackTrace();
+					}
+				} else {
+					// NUEVO/AÑADIDO: Integramos el método de limpieza reutilizable
+					limpiarCamposEditar();
+				}
+			}
+		});
 		
 		idAñadirM = new JTextField();
 		idAñadirM.setBounds(55, 91, 86, 20);
@@ -175,23 +195,22 @@ public class ventanaMercancia extends JFrame {
 		desEliminarM = new JComboBox<String>();
 		desEliminarM.setBounds(232, 200, 100, 22);
 		contentPane.add(desEliminarM);
-		añadirDes(desEliminarM);
 		
-		addWindowListener(new WindowAdapter()   //Es para que se ejecute cuando se abra la ventana automaticamente
+		addWindowListener(new WindowAdapter() 
 				{
 					@Override
 					public void windowOpened(WindowEvent e)
 					{
 						añadirDes(desEliminarM);
-						añadirDes(desEditarM);//Es el metodo que queremos que se ejecute
+						añadirDes(desEditarM);
+						calcularSiguienteId();
 					}
 				});
+		
 		JButton btnEliminarM = new JButton("ELIMINAR");
 		btnEliminarM.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				
 				eliminarItem(desEliminarM, desEditarM);
-				
 			}
 		});
 		btnEliminarM.setForeground(new Color(0, 0, 0));
@@ -232,31 +251,67 @@ public class ventanaMercancia extends JFrame {
 		precioEtiqueta.setFont(new Font("Tahoma", Font.BOLD, 12));
 		precioEtiqueta.setBounds(444, 62, 43, 19);
 		contentPane.add(precioEtiqueta);
-
 	}
 	
+	public void calcularSiguienteId() {
+		try {
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			String query = "SELECT MAX(ID_Merchandise) AS ultimoID FROM merchandise";
+			ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			
+			int siguienteId = 1; 
+			if (rs.next() && rs.getString("ultimoID") != null) {
+				siguienteId = rs.getInt("ultimoID") + 1;
+			}
+			
+			idAñadirM.setText(String.valueOf(siguienteId));
+			ventanaPrincipal.ConexionPrincipal.desconectar();
+		} catch (SQLException ex) {
+			ex.printStackTrace();
+			try { ventanaPrincipal.ConexionPrincipal.desconectar(); } catch(Exception e){}
+		}
+	}
 	
+	public String obtenerIdSeleccionado(String itemSeleccionado) {
+		if (itemSeleccionado == null || itemSeleccionado.equals("Seleccionar")) {
+			return null;
+		}
+		String[] separado = itemSeleccionado.split(" - "); //Divide el ID con un "-"
+		return separado[0]; // Selecciona el primer ID del array
+	}
+
+	//Método para limpiar los campos de texto
+	public void limpiarCamposEditar() {
+		nombreEditarM.setText("");
+		tipoEditarM.setText("");
+		precioEditarM.setText("");
+		idProveedorEditarM.setText("");
+	}
 	
-	public void añadirDes(JComboBox desEditarM)           //Método para añadir los productos al desplegable de editar.
+	public void añadirDes(JComboBox<String> desEditarM) 
 	{
 		try
 		{
 			ventanaPrincipal.ConexionPrincipal.conectar();
-			String query = "SELECT ID_Merchandise FROM merchandise ORDER BY ID_Merchandise ASC";
+			String query = "SELECT ID_Merchandise, Name FROM merchandise ORDER BY ID_Merchandise ASC"; 
 			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
 			desEditarM.removeAllItems();
 			
-			desEditarM.addItem("Seleccionar");	// Aparece Seleccionar por defecto en lugar de escoger un ID de producto
+			desEditarM.addItem("Seleccionar");
 
-	        // Cambiamos 'if' por 'while' para recorrer todas las filas
-	        while (resultado.next()) {
-	            // Usamos addItem para añadir el ID al desplegable
-	            desEditarM.addItem(resultado.getString("ID_Merchandise"));
+	        while (resultado.next())
+	        {
+	        	String Idnombre = resultado.getString("ID_Merchandise") + " - " + resultado.getString("Name");
+	            //Se añade directamente la variable string 'Idnombre' construida arriba
+	        	desEditarM.addItem(Idnombre);
 	        }
 	        
-	        desEditarM.setSelectedIndex(0);  //Selecciona el ítem vacío
+	        desEditarM.setSelectedIndex(0); 
 	        
-			ventanaPrincipal.ConexionPrincipal.desconectar(); 
+			ventanaPrincipal.ConexionPrincipal.desconectar();
+			
+			desEditarM.revalidate();
+			desEditarM.repaint();
 		}
 		catch (SQLException ex)
 		{
@@ -264,38 +319,48 @@ public class ventanaMercancia extends JFrame {
 		}
 	}
 	
-	
-	public void eliminarItem(JComboBox desEliminarM, JComboBox desEditarM)       //Método para eliminar un producto por ID
+	public void eliminarItem(JComboBox<String> desEliminarM, JComboBox<String> desEditarM) 
 	{
-		String idParaBorrar = (String) desEliminarM.getSelectedItem(); //Se obtiene el ID y se convierte en String.
+		String seleccionado = (String) desEliminarM.getSelectedItem(); 
+		
+		//Obtenemos el id con el metodo obtenerIdSeleccionado (Arriba)
+		String idParaBorrar = obtenerIdSeleccionado(seleccionado);
 
-	    if (idParaBorrar == null || idParaBorrar.equals("Seleccionar"))
+	    if (idParaBorrar == null)
 	    {   
 	    	JOptionPane.showMessageDialog(this, "Selecciona un producto.");
 	        return;
 	    }
 
-	    try {
+	    try
+	    {
 	        ventanaPrincipal.ConexionPrincipal.conectar();
+	        //Eliminamos por la ID
 	        String query = "DELETE FROM merchandise WHERE ID_Merchandise = '" + idParaBorrar + "'";
 	        ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(query);
 	        ventanaPrincipal.ConexionPrincipal.desconectar();
 
-	        añadirDes(desEliminarM);  //Refrescamos los desplegables para que no aparezcan en los dos cuando se elimina.
+	        añadirDes(desEliminarM); 
 	        añadirDes(desEditarM);
-	  
-	    } catch (SQLException ex) {
+	        
+	        calcularSiguienteId();
+	    }
+	    catch (SQLException ex)
+	    {
 	        ex.printStackTrace();
 	    }
 	}
 	
-	public void editarM()				// Método para editar atributos de un producto según su ID.
+	public void editarM() 
 	{
-	    String idSeleccionado = (String) desEditarM.getSelectedItem();
+	    String seleccionado = (String) desEditarM.getSelectedItem();
 	    
-	    if (idSeleccionado == null || idSeleccionado.equals("Seleccionar"))   //Si el id está vacío o no se ha elegido ninguno -->
+	    //Selecciona el producto por el método obtenerIdSeleccionado
+	    String idSeleccionado = obtenerIdSeleccionado(seleccionado);
+	    
+	    if (idSeleccionado == null) 
 	    {
-	        JOptionPane.showMessageDialog(this, "Selecciona un producto.");		// --> salta error pidiendo seleccionar un producto
+	        JOptionPane.showMessageDialog(this, "Selecciona un producto.");
 	        return;
 	    }
 
@@ -303,26 +368,35 @@ public class ventanaMercancia extends JFrame {
 	    {
 	        ventanaPrincipal.ConexionPrincipal.conectar();
 
+	        // NUEVO/AÑADIDO: La búsqueda previa se realiza utilizando el ID
 	        String queryBusqueda = "SELECT Name, Type, Price, ID_Supplier FROM merchandise WHERE ID_Merchandise = '" + idSeleccionado + "'";
 	        ResultSet rs = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(queryBusqueda);
 
 	        if (rs.next())
 	        {
-	            String nombreProducto = nombreEditarM.getText().trim().isEmpty() ? rs.getString("Name") : nombreEditarM.getText();     	            // Si el campo de la ventana está vacío, usamos el valor que ya hay en la BBDD
+	            String nombreProducto = nombreEditarM.getText().trim().isEmpty() ? rs.getString("Name") : nombreEditarM.getText(); 
 	            String tipoProducto = tipoEditarM.getText().trim().isEmpty() ? rs.getString("Type") : tipoEditarM.getText();
 	            String precioProducto = precioEditarM.getText().trim().isEmpty() ? rs.getString("Price") : precioEditarM.getText();
 	            String idProveedor = idProveedorEditarM.getText().trim().isEmpty() ? rs.getString("ID_Supplier") : idProveedorEditarM.getText();
 
+	            // NUEVO/AÑADIDO: Actualización condicionada únicamente al registro con el ID correspondiente
 	            String queryUpdate = "UPDATE merchandise SET " + "Name = '" + nombreProducto+ "', " + "Type = '" + tipoProducto + "', " + "Price = " + precioProducto + ", " + "ID_Supplier = " + idProveedor + " " + "WHERE ID_Merchandise = '" + idSeleccionado + "'";
 
 	            if (ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(queryUpdate) > 0)
 	            {
-	                JOptionPane.showMessageDialog(this, "Datos cambiados.");		
+	                ventanaPrincipal.ConexionPrincipal.desconectar();
+	                JOptionPane.showMessageDialog(this, "Datos cambiados.");
+	                
+	                añadirDes(desEditarM);
+	                añadirDes(desEliminarM);
+	                
+	                //Se llama al metodo para limpiar los campos
+	                limpiarCamposEditar();
+	                return;
 	            }
 	        }
 	        
 	        ventanaPrincipal.ConexionPrincipal.desconectar();
-
 	    }
 	    catch (SQLException ex)
 	    {
@@ -338,7 +412,6 @@ public class ventanaMercancia extends JFrame {
 		String precioProducto=precioAñadirM.getText().trim();
 		String proveedorProducto=idProveedorAñadirM.getText().trim();
 		
-		//Si un campo está vacio no se ejecuta la acción.
 		if (idProducto.isEmpty() || nombreProducto.isEmpty() || tipoProducto.isEmpty() || precioProducto.isEmpty() || proveedorProducto.isEmpty())
 		{
 			JOptionPane.showMessageDialog(this, "Rellene todos los campos.");
@@ -352,11 +425,25 @@ public class ventanaMercancia extends JFrame {
 			
 			if(ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(query)>0)
 			{
+				ventanaPrincipal.ConexionPrincipal.desconectar();
 				JOptionPane.showMessageDialog(this, "Producto añadido correctamente.");
 				
-				añadirDes(desEditarM);   //Limpiamos los campos.
+				//Se limpian los campos
+				añadirDes(desEditarM);
 				añadirDes(desEliminarM);
 				
+				// NUEVO/AÑADIDO: Reutilización del método unificado de limpieza
+				limpiarCamposEditar();
+				
+				// Limpieza específica del panel "Añadir"
+				idAñadirM.setText("");
+				nombreAñadirM.setText("");
+				tipoAñadirM.setText("");
+				precioAñadirM.setText("");
+				idProveedorAñadirM.setText("");
+				
+				calcularSiguienteId();
+				return;
 			}
 			ventanaPrincipal.ConexionPrincipal.desconectar();
 		}
@@ -368,13 +455,13 @@ public class ventanaMercancia extends JFrame {
 	
 	public void consultarM()
 	{
-		JFrame consultarTabla=new JFrame("Consulta de productos");  //Creamos la ventana dentro de la misma clase
+		JFrame consultarTabla=new JFrame("Consulta de productos"); 
 		consultarTabla.setBounds(100, 100, 700, 400);
-		consultarTabla.setLocationRelativeTo(null);   //Se centra la ventana
-		consultarTabla.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);   //Si se cierra esta ventana no afecta a las demás ventanas abiertas
+		consultarTabla.setLocationRelativeTo(null);   
+		consultarTabla.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);   
 		
-		String[] columnasTabla= {"ID de producto", "Nombre", "Tipo", "Precio", "ID de proveedor"};  //Se definen las cabeceras de la tabla
-		DefaultTableModel modeloTabla=new DefaultTableModel(null, columnasTabla);   //Creamos el modelo de la tabla
+		String[] columnasTabla= {"ID de producto", "Nombre", "Tipo", "Precio", "ID de proveedor"}; 
+		DefaultTableModel modeloTabla=new DefaultTableModel(null, columnasTabla);   
 		
 		try
 		{
@@ -384,14 +471,14 @@ public class ventanaMercancia extends JFrame {
 			
 			while(resultado.next())
 			{
-				Object[] filas=new Object[5];						//Creamos un array para representar las filas de la tabla
+				Object[] filas=new Object[5];						
 				filas[0]=resultado.getString("ID_Merchandise");
 				filas[1]=resultado.getString("Name");
 				filas[2]=resultado.getString("Type");
 				filas[3]=resultado.getString("Price");
 				filas[4]=resultado.getString("ID_Supplier");
 				
-				modeloTabla.addRow(filas);		//Se añaden las filas al modelo de la tabla
+				modeloTabla.addRow(filas);		
 			}
 			ventanaPrincipal.ConexionPrincipal.desconectar();
 		}
@@ -400,10 +487,8 @@ public class ventanaMercancia extends JFrame {
 			ex.printStackTrace();
 		}
 		
-		JTable tabla=new JTable(modeloTabla);   //Creamos la tabla con todos los datos de la BBDD
-		consultarTabla.add(new JScrollPane(tabla));		//Añadimos la tabla a JScrollPane para que podamos scrollear
-		consultarTabla.setVisible(true);		//Hacemos la tabla visible
-		
-		
+		JTable tabla=new JTable(modeloTabla);   
+		consultarTabla.add(new JScrollPane(tabla));		
+		consultarTabla.setVisible(true);		
 	}
 }

@@ -30,9 +30,6 @@ public class ventanaCompradores extends JFrame {
 		});
 	}
 
-	/**
-	 * Create the frame.
-	 */
 	public ventanaCompradores() {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 450, 300);
