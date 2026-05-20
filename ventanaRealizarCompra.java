@@ -1,41 +1,35 @@
 package Ventanas;
 
 import java.awt.EventQueue;
+
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.border.EmptyBorder;
-import javax.swing.table.DefaultTableModel;
+
+import ConexionBD.ConexionMySQL;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+
 import java.awt.Font;
-import javax.swing.JButton;
-import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.awt.event.ActionEvent;
-import java.awt.Color;
+
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JTextField;
-import javax.swing.SwingConstants;
-
-import com.toedter.calendar.JDateChooser;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.JSpinner;
 
 public class ventanaRealizarCompra extends JFrame {
 
 	private static final long serialVersionUID = 1L;
 	private JPanel contentPane;
+	private JTextField precioRC;
+	private boolean Actualizacion = false; //Este boolean evita buques infinitos
+	private int precioBase = 0; //Para a la hora de calcular el precio este buscara el precio base en la base de datos en la tabla mercancias
 	
-	// Constructores de los componentes del JFrame
-	private JComboBox<String> desProducto;
-	private JComboBox<String> desProveedor;
-	private JTextField coste;
-	private JDateChooser elegirFecha;
-
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
@@ -49,204 +43,327 @@ public class ventanaRealizarCompra extends JFrame {
 		});
 	}
 
+	/**
+	 * Create the frame.
+	 */
 	public ventanaRealizarCompra() {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setBounds(100, 100, 768, 424);
-		setLocationRelativeTo(null);
+		setBounds(100, 100, 463, 291);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		setContentPane(contentPane);
 		contentPane.setLayout(null);
 		
-		JLabel lblTitulo = new JLabel("Realizar compra de productos");
-		lblTitulo.setBounds(234, 21, 300, 19);
-		lblTitulo.setFont(new Font("Tahoma", Font.BOLD, 15));
-		contentPane.add(lblTitulo);
+		JLabel lblRealizarCompraDe = new JLabel("Realizar compra de productos");
+		lblRealizarCompraDe.setFont(new Font("Tahoma", Font.BOLD, 15));
+		lblRealizarCompraDe.setBounds(115, 11, 239, 35);
+		contentPane.add(lblRealizarCompraDe);
 		
-		JLabel lblProducto = new JLabel("Producto");
-		lblProducto.setFont(new Font("Tahoma", Font.BOLD, 12));
-		lblProducto.setBounds(75, 75, 100, 19);
-		contentPane.add(lblProducto);
-		
-		desProducto = new JComboBox<String>();
-		desProducto.setBounds(75, 105, 130, 25);
-		contentPane.add(desProducto);
-		
-		JLabel lblProveedor = new JLabel("Proveedor");
-		lblProveedor.setFont(new Font("Tahoma", Font.BOLD, 12));
-		lblProveedor.setBounds(240, 75, 100, 19);
-		contentPane.add(lblProveedor);
-		
-		desProveedor = new JComboBox<String>();
-		desProveedor.setBounds(240, 105, 130, 25);
-		contentPane.add(desProveedor);
-		
-		JLabel lblCoste = new JLabel("Coste");
-		lblCoste.setFont(new Font("Tahoma", Font.BOLD, 12));
-		lblCoste.setBounds(410, 75, 100, 19);
-		contentPane.add(lblCoste);
-		
-		coste = new JTextField();
-		coste.setBounds(410, 105, 130, 25);
-		contentPane.add(coste);
-		coste.setColumns(10);
-		
-		JLabel lblFecha = new JLabel("Fecha de compra");
-		lblFecha.setFont(new Font("Tahoma", Font.BOLD, 12));
-		lblFecha.setBounds(580, 75, 130, 19);
-		contentPane.add(lblFecha);
-		
-		elegirFecha = new JDateChooser();
-		elegirFecha.setBounds(580, 105, 130, 25);
-		contentPane.add(elegirFecha);
-		
-		JButton btnAñadir = new JButton("AÑADIR");
-		btnAñadir.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				añadirCompra();
-			}
-		});
-		btnAñadir.setBounds(580, 250, 110, 31);
-		contentPane.add(btnAñadir);
-		
-		JButton atras = new JButton("Atrás"); //Botón para ir hacia la ventana anterior
-		atras.setBounds(42, 302, 89, 23);
+		JButton atras = new JButton("Atrás");
+		atras.setBounds(10, 227, 89, 23);
 		contentPane.add(atras);
-		atras.addActionListener(e -> {
-			dispose();
-			new ventanaCompradores().setVisible(true);
+		
+		JComboBox desProveedoresRC = new JComboBox();
+		desProveedoresRC.setBounds(115, 96, 140, 22);
+		contentPane.add(desProveedoresRC);
+		añadirProveedor(desProveedoresRC);
+		
+		JComboBox desMercanciaRC = new JComboBox();
+		desMercanciaRC.setBounds(115, 131, 140, 22);
+		contentPane.add(desMercanciaRC);
+		añadirMercancia(desMercanciaRC);
+		
+		precioRC = new JTextField();
+		precioRC.setEditable(false);
+		precioRC.setBounds(289, 114, 58, 20);
+		contentPane.add(precioRC);
+		precioRC.setColumns(10);
+		
+		JButton botonCompra = new JButton("Comprar");
+		botonCompra.setBounds(164, 183, 88, 22);
+		contentPane.add(botonCompra);
+		
+		JLabel TPrecioRC = new JLabel("Precio");
+		TPrecioRC.setFont(new Font("Tahoma", Font.BOLD, 15));
+		TPrecioRC.setBounds(289, 68, 65, 35);
+		contentPane.add(TPrecioRC);
+		
+		JLabel TCantidadRC_1 = new JLabel("Cantidad");
+		TCantidadRC_1.setFont(new Font("Tahoma", Font.BOLD, 15));
+		TCantidadRC_1.setBounds(374, 68, 75, 35);
+		contentPane.add(TCantidadRC_1);
+		
+		//Configuracion de la cantidad
+		SpinnerNumberModel modeloSpinner = new SpinnerNumberModel(10, 10, 1000, 10); //(Valor inicial = 10, Mínimo = 10, Máximo = 1000, Incremento = 10)
+		JSpinner CantidadRC = new JSpinner(modeloSpinner);
+		CantidadRC.setBounds(395, 114, 45, 20);
+		contentPane.add(CantidadRC);
+		
+		//Acciones del boton Compra
+		botonCompra.addActionListener(e ->{
+			String proveedorSeleccionado = (String) desProveedoresRC.getSelectedItem();
+			String mercanciaSeleccionada = (String) desMercanciaRC.getSelectedItem();
+			
+			if (proveedorSeleccionado == null || proveedorSeleccionado.equals("Proveedor") ||
+					mercanciaSeleccionada == null || mercanciaSeleccionada.equals("Mercancia")) {
+					JOptionPane.showMessageDialog(this, "Debe seleccionar un proveedor y una mercancía.", "Aviso", JOptionPane.WARNING_MESSAGE);
+					return;
+				}
+			
+			String idProveedor = proveedorSeleccionado.split(" - ")[0];
+			String idMercancia = mercanciaSeleccionada.split(" - ")[0];
+			int cantidad = (int) CantidadRC.getValue();
+			int costoTotal = precioBase * cantidad; // Calculamos el coste final exacto
+			
+			try {
+				ventanaPrincipal.ConexionPrincipal.conectar();
+				
+				// Query adaptada a la tabla 'buy' usando CURDATE() para registrar el momento de la acción
+				String queryInsert = "INSERT INTO buy (ID_Merchandise, ID_Supplier, Cost, Quantity, Purchase_Date) " + "VALUES ('" +idMercancia+ "', '" +idProveedor+ "', " +costoTotal+ ", " +cantidad+ ", CURDATE())";
+				
+				// Ejecutamos la inserción (reemplazar por tu método UID de escritura si es necesario)
+				ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(queryInsert);
+				ventanaPrincipal.ConexionPrincipal.desconectar();
+				
+				JOptionPane.showMessageDialog(this, "La compra a sido un exito", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+				
+				// Limpieza 
+				precioRC.setText("");
+				precioBase = 0;
+				CantidadRC.setValue(10);
+				desProveedoresRC.setSelectedIndex(0);
+				
+			} catch (SQLException ex) {
+				ex.printStackTrace();
+				JOptionPane.showMessageDialog(this, "Error de compra.", "Error", JOptionPane.ERROR_MESSAGE);
+			}
+			
+			
 		});
 		
-		addWindowListener(new WindowAdapter() //Es para que se ejecute cuando se abra la ventana automaticamente
-			{
-				@Override
-				public void windowOpened(WindowEvent e)
-				{
-					cargarProductos(); //Es el metodo que queremos que se ejecute
-					cargarProveedores();
+		
+		
+		//Para poder conectar los dos Desplegables Para Proveedores
+		desProveedoresRC.addActionListener(e ->{
+			if (Actualizacion) return;
+			
+			String seleccion = (String) desProveedoresRC.getSelectedItem();
+			
+			if (seleccion != null && !seleccion.equals("Proveedor")) {
+				String idProveedorLimpio = seleccion.split(" - ")[0];
+				// Filtramos el combo de mercancías usando este ID de proveedor
+				filtrarMercancia(desMercanciaRC, idProveedorLimpio);
+				precioRC.setText("");
+				precioBase = 0;
+				CantidadRC.setValue(10);
+			} else {
+				// Si vuelven a poner la opción por defecto, recargamos todas las mercancías de nuevo
+				if (!Actualizacion) {
+					añadirMercancia(desMercanciaRC);
+					precioRC.setText("");
+					precioBase = 0;
+					CantidadRC.setValue(10);
 				}
-			});
-	}
-	
-	// Método para extraer el ID de la cadena combinada "ID - Nombre"
-	public String obtenerIdSeleccionado(String itemSeleccionado)
-	{
-		if (itemSeleccionado == null || itemSeleccionado.equals("Seleccionar"))
-		{
-			return null;
-		}
-		String[] separado = itemSeleccionado.split(" - ");   //Divide el item con "-"
-		return separado[0]; 	//Selecciona el primer item del array (1º ID)
-	}
-	
-	public void cargarProductos() //Método para añadir los productos al desplegable.
-	{
-		try
-		{
-			ventanaPrincipal.ConexionPrincipal.conectar();
-			String query = "SELECT ID_Merchandise, Name FROM merchandise ORDER BY ID_Merchandise ASC"; 
-			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
-			desProducto.removeAllItems();		//Mostramos todos los productos en el desplegable
-			
-			desProducto.addItem("Seleccionar");
-
-			while (resultado.next())
-			{
-				String Idnombre = resultado.getString("ID_Merchandise") + " - " + resultado.getString("Name");   //Muestra el ID y el nombre separado por "-"
-				desProducto.addItem(Idnombre);
 			}
-	        
-			desProducto.setSelectedIndex(0); 
-	        
-			ventanaPrincipal.ConexionPrincipal.desconectar();
-			desProducto.revalidate();     //Limpiamos el campo Productos
-			desProducto.repaint();
-		}
-		catch (SQLException ex)
-		{
-			ex.printStackTrace();
-		}
-	}
-	
-	public void cargarProveedores() //Método para añadir los proveedores al desplegable.
-	{
-		try
-		{
-			ventanaPrincipal.ConexionPrincipal.conectar();
-			String query = "SELECT ID_Supplier, Name FROM supplier ORDER BY ID_Supplier ASC"; 
-			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
-			desProveedor.removeAllItems();		//Mostramos los proveedores en el desplegable
-			
-			desProveedor.addItem("Seleccionar");
+		});
+		
+		//Para poder conectar los dos Desplegables Para Mercancia
+		
+		desMercanciaRC.addActionListener(e -> {
+			if (Actualizacion) return;
 
-			while (resultado.next())
-			{
-				String Idnombre = resultado.getString("ID_Supplier") + " - " + resultado.getString("Name");		//Muestra el ID y el nombre separado por "-"
-				desProveedor.addItem(Idnombre);
-			}
-	        
-			desProveedor.setSelectedIndex(0); 
-	        
-			ventanaPrincipal.ConexionPrincipal.desconectar();
+			String seleccion = (String) desMercanciaRC.getSelectedItem();
 			
-			desProveedor.revalidate();   //Limpiamos el campo Proveedores
-			desProveedor.repaint();
-		}
-		catch (SQLException ex)
-		{
-			ex.printStackTrace();
-		}
-	}
-	
-	public void añadirCompra()
-	{
-		String prodSeleccionado = (String) desProducto.getSelectedItem();
-		String provSeleccionado = (String) desProveedor.getSelectedItem();
-		String costeTexto = coste.getText().trim();
-		
-		String idProducto = obtenerIdSeleccionado(prodSeleccionado);
-		String idProveedor = obtenerIdSeleccionado(provSeleccionado);
-		
-		//Formateamos la fecha para que sea válida en la BBDD
-		String fechaTexto = "";
-		if (elegirFecha.getDate() != null) {
-			SimpleDateFormat fech = new SimpleDateFormat("yyyy-MM-dd");
-			fechaTexto = fech.format(elegirFecha.getDate());
-		}
-		
-		//Si un campo está vacio no se ejecuta
-		if (idProducto == null || idProveedor == null || costeTexto.isEmpty() || fechaTexto.isEmpty())
-		{
-			JOptionPane.showMessageDialog(this, "Rellene todos los campos.");
-			return;
-		}
-		
-		try
-		{
-			// Convertimos el coste a int para insertar en la BBDD
-			int costeInt = Integer.parseInt(costeTexto);
-			
-			ventanaPrincipal.ConexionPrincipal.conectar();
-			
-			String query = "INSERT INTO buy (ID_Merchandise, ID_Supplier, Cost, Purchase_Date) VALUES (" + "'" + idProducto + "', " + "'" + idProveedor + "', " + costeInt + ", " + "'" + fechaTexto + "')";
-			
-			if(ventanaPrincipal.ConexionPrincipal.ejecutarInsertDeleteUpdate(query) > 0)
-			{
-				ventanaPrincipal.ConexionPrincipal.desconectar();
-				JOptionPane.showMessageDialog(this, "Compra añadida correctamente.");
+			if (seleccion != null && !seleccion.equals("Mercancancia") && !seleccion.equals("Mercancia")) {
+				String idMercanciaLimpia = seleccion.split(" - ")[0];
 				
-				// Limpiamos los campos
-				desProducto.setSelectedIndex(0);
-				desProveedor.setSelectedIndex(0);
-				coste.setText("");
-				elegirFecha.setDate(null);
-				return;
+				// Buscamos a qué proveedor pertenece esta mercancía y forzamos su selección
+				filtrarProveedor(desProveedoresRC, idMercanciaLimpia);
+				
+				//Buscamos el precio en la Base de Datos
+				obtenerPrecio(idMercanciaLimpia, CantidadRC);
+			} else {
+				precioRC.setText("");
+				precioBase = 0;
+				CantidadRC.setValue(10);
+			}
+		});
+		
+		//Multiplica la cantidad que tiene selecionada
+		CantidadRC.addChangeListener(e -> {
+			int cantidad = (int) CantidadRC.getValue();
+			int totalCalculado = precioBase * cantidad;
+			
+			//para que lo muestre en el precio
+			precioRC.setText(String.valueOf(totalCalculado));
+		});
+		
+		
+		//Para volver atras
+		atras.addActionListener(e -> {
+
+			dispose();
+
+			new ventanaCompradores().setVisible(true);
+
+		});
+		
+		//Para ejecutarlo nada mas entres las funciones que estan dentro
+		addWindowListener(new WindowAdapter()   //Es para que se ejecute cuando se abra la ventana automaticamente
+				{
+					@Override
+					public void windowOpened(WindowEvent e)
+					{
+						añadirProveedor(desProveedoresRC);
+						añadirMercancia(desMercanciaRC);
+					}
+				});
+		
+
+	}
+	
+	public void añadirProveedor(JComboBox<String> desProveedoresRC) {
+		try {
+			Actualizacion = true;
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			String query = "SELECT ID_Supplier, Name FROM supplier ORDER BY ID_Supplier ASC";
+			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			desProveedoresRC.removeAllItems();
+			
+			desProveedoresRC.addItem("Proveedor");
+			while (resultado.next()) {
+	            // Usamos addItem para añadir el ID al desplegable
+	            desProveedoresRC.addItem(resultado.getString("ID_Supplier")+ " - " + resultado.getString("Name"));
+	        }
+
+			desProveedoresRC.setSelectedIndex(0); 
+	        
+			ventanaPrincipal.ConexionPrincipal.desconectar();
+			
+			desProveedoresRC.revalidate();
+			desProveedoresRC.repaint();
+			Actualizacion = false;
+		}
+		catch(SQLException ex){
+			ex.printStackTrace();
+			Actualizacion = false;
+		}
+		
+	}
+	
+	public void añadirMercancia(JComboBox<String> desMercanciaRC) {
+		try {
+			Actualizacion = true;
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			String query = "SELECT ID_Merchandise, Name FROM merchandise ORDER BY ID_Supplier ASC";
+			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			desMercanciaRC.removeAllItems();
+			
+			desMercanciaRC.addItem("Mercancia");
+			while (resultado.next()) {
+	            // Usamos addItem para añadir el ID al desplegable
+				desMercanciaRC.addItem(resultado.getString("ID_Merchandise")+ " - " + resultado.getString("Name"));
+	        }
+	        
+			desMercanciaRC.setSelectedIndex(0);  //Selecciona el ítem vacío
+	        
+			ventanaPrincipal.ConexionPrincipal.desconectar(); 
+			Actualizacion = false;
+		}
+		catch(SQLException ex){
+			ex.printStackTrace();
+			Actualizacion = false;
+		}
+		
+	}
+	
+	//Flitros para los desprlables 
+	
+	//Proveedores seleciona las mercancias que son de estos proveedores
+	
+	public void filtrarMercancia (JComboBox desMercanciaRC, String idProveedor) {
+		try {
+			Actualizacion = true;
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			
+			String query = "SELECT ID_Merchandise, Name FROM merchandise WHERE ID_Supplier = '" + idProveedor + "' ORDER BY ID_Merchandise ASC";
+			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			desMercanciaRC.removeAllItems();
+			
+			desMercanciaRC.addItem("Mercancia");
+			while (resultado.next()) {
+				desMercanciaRC.addItem(resultado.getString("ID_Merchandise") + " - " + resultado.getString("Name"));
+			}
+			
+			desMercanciaRC.setSelectedIndex(0);
+			ventanaPrincipal.ConexionPrincipal.desconectar();
+			
+			desMercanciaRC.revalidate();
+			desMercanciaRC.repaint();
+			Actualizacion = false;
+		}catch (SQLException ex) {
+			ex.printStackTrace();
+			Actualizacion = false;
+		}
+	}
+	
+	//Mercancia seleciona su proveedor
+	public void filtrarProveedor (JComboBox desProveedoresRC, String idMercancia) {
+		try {
+			Actualizacion = true;
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			//Pedimos con el Selecte que nosde el id del proveedor
+			String query = "SELECT ID_Supplier FROM merchandise WHERE ID_Merchandise = '" + idMercancia + "'";
+			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+				if (resultado.next()) {
+					String idProveedorAsociado = resultado.getString("ID_Supplier");
+					ventanaPrincipal.ConexionPrincipal.desconectar();
+				
+					Actualizacion = true; // Activamos bandera para obligar al combo de proveedores a cambiar sin alterar el resto
+				
+					// Recorremos los ítems del combo de proveedores buscando cuál empieza con el ID que necesitamos
+					for (int i = 0; i < desProveedoresRC.getItemCount(); i++) {
+						String item = (String) desProveedoresRC.getItemAt(i);
+							if (item.startsWith(idProveedorAsociado + " - ")) {
+								desProveedoresRC.setSelectedIndex(i); // Seleccionamos el proveedor correcto automáticamente
+								break;
+							}
+					}
+					Actualizacion = false;
+				} else {
+					ventanaPrincipal.ConexionPrincipal.desconectar();
+				}
+			
+		
+		}catch (SQLException ex) {
+			ex.printStackTrace();
+			Actualizacion = false;
+		}
+	}
+	
+	//Calcular el costo al buscar el precio base
+	public void obtenerPrecio(String idMercancia, JSpinner cantidadSelecionad) {
+		
+		try{
+			ventanaPrincipal.ConexionPrincipal.conectar();
+			//Buscamos el precio en la base de datos en la tabla de mercancias
+			String query = "SELECT Price FROM merchandise WHERE ID_Merchandise = '" + idMercancia + "'";
+			ResultSet resultado = ventanaPrincipal.ConexionPrincipal.ejecutarSelect(query);
+			
+			if (resultado.next()) {
+				precioBase = resultado.getInt("Price"); //Guardar el precio
+				
+				//Multiplicamos
+				int cantidadActual = (int) cantidadSelecionad.getValue();
+				int costoInicial = precioBase * cantidadActual;
+				
+				precioRC.setText(String.valueOf(costoInicial));
+				
 			}
 			ventanaPrincipal.ConexionPrincipal.desconectar();
-		}
-		catch (SQLException ex)
-		{
+		}catch(SQLException ex){
 			ex.printStackTrace();
 		}
 	}
+	
 }
